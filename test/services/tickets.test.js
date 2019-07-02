@@ -1,112 +1,171 @@
 'use strict'
 
 const {test} = require('tap')
-const {build,} = require('../helper')
+const {
+    build,
+    testWithLogin,
+    createUser
+} = require('../helper')
 
-test('create and get ticket', async (t) => {
+test('cannot create a ticket without a login', async (t) => {
     const app = build(t)
 
-    const resCreate = await app.inject({
+    const res = await app.inject({
         method: 'POST',
         url: '/tickets',
         body: {
-            title: 'ticket 1',
-            body: 'text'
+            title: 'A support ticket',
+            body: 'this is a long body'
         }
     })
-    t.equal(resCreate.statusCode, 201)
 
-    const bodyCreate = JSON.parse(resCreate.body)
-    t.ok(bodyCreate._id)
-    const url = `/tickets/${bodyCreate._id}`
-    t.equal(resCreate.headers.location, url)
-
-    const resGet = await app.inject({
-        method: 'GET',
-        url
-    })
-
-    t.equal(resGet.statusCode, 200)
-    t.deepEqual(JSON.parse(resGet.body), {
-        _id: bodyCreate._id,
-        title: 'ticket 1',
-        body: 'text'
-    })
+    t.equal(res.statusCode, 401)
 })
 
-test('create and get all', async (t) => {
+test('cannot get all tickets without a login', async (t) => {
     const app = build(t)
 
-    const resCreate1 = await app.inject({
-        method: 'POST',
-        url: '/tickets',
-        body: {
-            title: 'ticket 1',
-            body: 'text 1'
-        }
-    })
-    const resCreate2 = await app.inject({
-        method: 'POST',
-        url: '/tickets',
-        body: {
-            title: 'ticket 2',
-            body: 'text 2'
-        }
-    })
-    t.equal(resCreate1.statusCode, 201)
-    t.equal(resCreate2.statusCode, 201)
-
-    const bodyCreate1 = JSON.parse(resCreate1.body)
-    const bodyCreate2 = JSON.parse(resCreate2.body)
-
-    t.ok(bodyCreate1._id)
-    t.ok(bodyCreate2._id)
-
-    const resGetAll = await app.inject({
+    const res = await app.inject({
         method: 'GET',
         url: '/tickets'
     })
 
-    t.equal(resGetAll.statusCode, 200)
+    t.equal(res.statusCode, 401)
+})
 
-    t.deepEqual(JSON.parse(resGetAll.body), {
-        tickets: [
-            {
-                _id: bodyCreate2._id,
-                title: 'ticket 2',
-                body: 'text 2'
-            },
-            {
-                _id: bodyCreate1._id,
-                title: 'ticket 1',
-                body: 'text 1'
-            }
-        ]
+testWithLogin('create and get ticket', async (t, inject) => {
+    const res1 = await inject({
+        method: 'POST',
+        url: '/tickets',
+        body: {
+            title: 'A support ticket',
+            body: 'this is a long body'
+        }
+    })
+
+    t.equal(res1.statusCode, 201) // Created
+    const body1 = JSON.parse(res1.body)
+
+    t.ok(body1._id)
+    const url = `/tickets/${body1._id}`
+    t.equal(res1.headers.location, url)
+
+    const res2 = await inject({
+        method: 'GET',
+        url
+    })
+
+    t.equal(res2.statusCode, 200)
+
+    t.deepEqual(JSON.parse(res2.body), {
+        _id: body1._id,
+        title: 'A support ticket',
+        body: 'this is a long body'
     })
 })
 
-test('create fails', async (t) => {
+test('tickets are user specific', async (t) => {
     const app = build(t)
 
-    const resCreate1 = await app.inject({
-        method: 'POST',
-        url: '/tickets',
-        body: {
-            body: 'text'
-        }
+    const token1 = await createUser(t, app, {
+        username: 'matteo',
+        password: 'matteo'
     })
-    t.equal(resCreate1.statusCode, 400)
-    const bodyCreate1 = JSON.parse(resCreate1.body)
-    t.equal(bodyCreate1.message, "body should have required property 'title'")
 
-    const resCreate2 = await app.inject({
+    const token2 = await createUser(t, app, {
+        username: 'marco',
+        password: 'marco'
+    })
+
+    const post1 = await app.inject({
+        method: 'POST',
+        url: '/tickets',
+        headers: {
+            authorization: `Bearer ${token1}`
+        },
+        body: {
+            title: 'AAA',
+            body: 'BBB'
+        }
+    })
+
+    // we are asking to access the created ticket
+    // with the other user
+    const get1 = await app.inject({
+        method: 'GET',
+        url: post1.headers.location,
+        headers: {
+            authorization: `Bearer ${token2}`
+        }
+    })
+
+    t.equal(get1.statusCode, 404)
+})
+
+testWithLogin('create and get all', async (t, inject) => {
+    const res1 = await inject({
         method: 'POST',
         url: '/tickets',
         body: {
-            title: 'title'
+            title: 'A support ticket',
+            body: 'this is a long body'
         }
     })
-    t.equal(resCreate2.statusCode, 400)
-    const bodyCreate2 = JSON.parse(resCreate2.body)
-    t.equal(bodyCreate2.message, "body should have required property 'body'")
+
+    const res2 = await inject({
+        method: 'POST',
+        url: '/tickets',
+        body: {
+            title: 'Another support ticket',
+            body: 'this is a long body'
+        }
+    })
+
+    const body1 = JSON.parse(res1.body)
+    const body2 = JSON.parse(res2.body)
+
+    const resAll = await inject({
+        method: 'GET',
+        url: '/tickets'
+    })
+
+    t.equal(resAll.statusCode, 200)
+
+    t.deepEqual(JSON.parse(resAll.body), {
+        tickets: [{
+            _id: body2._id,
+            title: 'Another support ticket',
+            body: 'this is a long body'
+        }, {
+            _id: body1._id,
+            title: 'A support ticket',
+            body: 'this is a long body'
+        }]
+    })
+})
+
+testWithLogin('do not create a ticket without a title', async (t, inject) => {
+    const res1 = await inject({
+        method: 'POST',
+        url: '/tickets',
+        body: {
+            body: 'this is a long body'
+        }
+    })
+
+    t.equal(res1.statusCode, 400)
+    t.equal(JSON.parse(res1.body).message, 'body should have required property \'title\'')
+})
+
+testWithLogin('do not create a ticket without a body', async (t, inject) => {
+    const res1 = await inject({
+        method: 'POST',
+        url: '/tickets',
+        body: {
+            title: 'A support ticket'
+        }
+    })
+
+    t.equal(res1.statusCode, 400)
+    t.equal(JSON.parse(res1.body).message, 'body should have required property \'body\'')
 })
