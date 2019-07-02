@@ -4,7 +4,18 @@ module.exports = async function (fastify, opts) {
     const tickets = fastify.mongo.db.collection('tickets')
     const {ObjectId} = fastify.mongo
 
-    fastify.post('/', async function (request, reply) {
+    const schema = {
+        body: {
+            type: 'object',
+            required: ['title', 'body'],
+            properties: {
+                title: {type: 'string'},
+                body: {type: 'string'}
+            }
+        }
+    }
+
+    fastify.post('/', {schema}, async function (request, reply) {
         const data = await tickets.insertOne(request.body)
 
         const _id = data.ops[0]._id

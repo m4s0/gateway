@@ -84,3 +84,29 @@ test('create and get all', async (t) => {
         ]
     })
 })
+
+test('create fails', async (t) => {
+    const app = build(t)
+
+    const resCreate1 = await app.inject({
+        method: 'POST',
+        url: '/tickets',
+        body: {
+            body: 'text'
+        }
+    })
+    t.equal(resCreate1.statusCode, 400)
+    const bodyCreate1 = JSON.parse(resCreate1.body)
+    t.equal(bodyCreate1.message, "body should have required property 'title'")
+
+    const resCreate2 = await app.inject({
+        method: 'POST',
+        url: '/tickets',
+        body: {
+            title: 'title'
+        }
+    })
+    t.equal(resCreate2.statusCode, 400)
+    const bodyCreate2 = JSON.parse(resCreate2.body)
+    t.equal(bodyCreate2.message, "body should have required property 'body'")
+})
