@@ -45,7 +45,11 @@ function config() {
 
 // automatically build and tear down our instance
 function build(t) {
-    const app = Fastify()
+    const app = Fastify({
+        logger: {
+            lever: 'error'
+        }
+    })
 
     // fastify-plugin ensures that all decorators
     // are exposed for testing purposes, this is
