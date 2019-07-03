@@ -65,3 +65,5 @@ package-lock.json
 examples/typescript-server.js
 test/types/index.js
 .env
+
+/.idea

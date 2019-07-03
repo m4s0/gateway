@@ -3,10 +3,10 @@
 const HttpProxy = require('fastify-http-proxy')
 
 module.exports = async function (app, opts) {
-    opts.auth = opts.auth || {}
+    opts.tickets = opts.tickets || {}
     app.register(HttpProxy, {
-        upstream: opts.auth.url || process.env.AUTH_SERVICE
+        upstream: opts.tickets.url || process.env.TICKET_SERVICE
     })
 }
 
-module.exports.autoPrefix = '/users'
+module.exports.autoPrefix = '/tickets'

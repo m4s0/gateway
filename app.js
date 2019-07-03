@@ -2,7 +2,6 @@
 
 const path = require('path')
 const AutoLoad = require('fastify-autoload')
-const proxy = require('fastify-http-proxy')
 
 module.exports = function (fastify, opts, next) {
   // Place here your custom code!
@@ -22,12 +21,6 @@ module.exports = function (fastify, opts, next) {
   fastify.register(AutoLoad, {
     dir: path.join(__dirname, 'services'),
     options: Object.assign({}, opts)
-  })
-
-  fastify.register(proxy, {
-    upstream: 'http://127.0.0.1:3001',
-    prefix: '/tickets', // optional
-    http2: false // optional
   })
 
   // Make sure to call next when done
